@@ -162,20 +162,7 @@ presenting NF4 numbers as if they were full precision.
 python kv_eviction.py --model Qwen/Qwen3-8B --diagnose \
   --n-anchors 20 --diag-budgets 0.05 0.5 --out-dir results_qwen3_512
 ```
-
-This is what produced the norm-eviction analysis. It measures, per layer: the Spearman
-correlation between ||k|| and attention actually received, the spread of ||k||, how much
-attention mass each selection rule recovers against an oracle, where the retained positions
-sit in the sequence, and the error in the reconstructed context vector.
-
-Headline numbers from the paper: rho = -0.342 on Llama-3.1-8B (negative in all 32 layers) and
--0.081 on Qwen3-8B (wrong sign in 11 of 36 layers). Qwen3 normalizes queries and keys per
-head before the rotary embedding, which narrows the spread of ||k||; Llama-3.1 does not.
-Since the rotary embedding is a rotation, key norms are identical before and after it, so it
-does not matter where you measure them.
-
-`--n-anchors` is honoured here. An earlier version silently capped it at 4, which is the kind
-of bug that makes a diagnostic look noisy for no reason.
+This would be used for norm-eviction analysis.
 
 ---
 
