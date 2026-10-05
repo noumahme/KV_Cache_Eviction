@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""
-Build every table and matrix reported in the paper from the harness output.
-
-Inputs (per model): raw_L{L}.csv, summary_paired.csv, anchors_used.json
-Outputs: one .tsv per table (paste into Word) and one .tex per table (booktabs).
-
-Nothing here recomputes statistics that summary_paired.csv already carries; the
-only things computed from raw are descriptive (medians, ranges, retirement
-fractions) that the summary file does not store. Where both exist, a
-consistency check compares them and refuses to emit on disagreement.
-"""
 
 import argparse, csv, glob, json, math, os, sys
 from collections import defaultdict
