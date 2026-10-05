@@ -1,73 +1,16 @@
 #!/usr/bin/env python3
 """
-kv_eviction_extended.py
-=======================
-
-Extends the budget-constrained KV-cache eviction study (Qwen3-8B, NF4, WikiText-103,
-multi-anchor paired design) with three additional policies:
-
-  * normkv      - L2-norm key eviction (Devoto et al., EMNLP 2024, "A Simple and
-                  Effective L2 Norm-Based Strategy for KV Cache Compression").
-                  Per KV head, keep the tokens with the LOWEST ||k||_2.
-  * pyramidkv   - PyramidKV (Cai et al., 2024). SnapKV-style observation-window
-                  scoring, but with a pyramidal per-layer budget (large in lower
-                  layers, small in upper layers) whose mean equals the global budget.
-  * tova        - TOVA (Oren et al., 2024, "Transformers are Multi-State RNNs").
-                  Head-averaged attention of the current (last) query; the same token
-                  set is kept for every KV head in a layer.
-                    - `tova`        one-shot at the end of prefill (kvpress-style)
-                    - `tova_stream` faithful sequential TOVA: fill to budget, then
-                                    evict after every chunk of `--tova-chunk` tokens
-                                    (chunk=1 is exact TOVA; slow)
-
-The reference conditions are re-run inside this script so every comparison is
-paired on identical anchors:
-
-  * full         - no eviction
-  * snapkv       - canonical SnapKV (observation window + pooled scores + window kept)
-  * sink_window  - attention sinks + recency window (StreamingLLM-style)
-  * recency      - pure sliding window, no sinks
-  * random       - unstructured control (uniform random subset per KV head)
-
-Models: written against Qwen3 but architecture-agnostic (QK-norm is applied only when the
-attention module has q_norm), so Llama-family models work too. ALWAYS run --selftest on a
-new model before a long job. Each model gets its own tokenised-corpus cache, because
-tokenisers differ and a shared cache would feed one model's token ids to another.
-
-Evaluation protocol (per anchor):
-  1. Prefill `L` context tokens (logits_to_keep=1, so no L x vocab logit tensor).
-  2. Compress the context KV cache to `round(budget * L)` tokens per head per layer
-     (PyramidKV: mean over layers equals that number).
-  3. Score the next `--eval-tokens` tokens with teacher forcing; PPL over them.
-  Cached keys keep their ORIGINAL RoPE rotation; continuation tokens get their true
-  absolute positions (L, L+1, ...). No position re-indexing is applied.
-
-"Capture once, compress many": for all one-shot policies, compression at layer l is a
-function of layer l's full-prefill keys and window queries only (layer l+1's input does
-not depend on layer l's eviction, because eviction happens after layer l's attention
-has been computed with the full cache). So we run ONE full prefill per anchor, capture
-per-layer window queries, and derive every (policy, budget) cache by gathering from the
-full cache. This is exactly equivalent to in-forward compression (kvpress /
-KVCache-Factory behaviour) and ~20x cheaper. `tova_stream` is sequential by nature and
-gets its own prefill.
-
-Statistics: paired differences Delta PPL = PPL(method) - PPL(comparator) across anchors;
-mean, SD, 95% CI with exact t_crit(df=n-1) (2.093 for n=20), paired t-test, Cohen's d_z.
-Holm correction is applied across context lengths (m = number of lengths) ONLY at the
-primary budget (`--primary-budget`, default 0.05); all other budgets are flagged
-exploratory and receive no significance marker.
-
 Usage
 -----
   # Default run: both lengths, all policies, standard budget sweep
-  python kv_eviction_extended.py --out-dir results_extended
+  python kv_eviction.py --out-dir results_extended
 
   # Reuse the exact anchors from your existing SnapKV runs (strongly recommended so
   # the new rows pair with your existing tables):
-  python kv_eviction_extended.py --anchors-file anchors.json
+  python kv_eviction.py --anchors-file anchors.json
 
   # Quick correctness check on the real model before a long run (~minutes):
-  python kv_eviction_extended.py --selftest
+  python kv_eviction.py --selftest
 
 anchors.json format: {"4096": [offset, ...], "8192": [offset, ...]} where each offset is
 a token index into the tokenized, "\n\n"-joined WikiText-103 split.
