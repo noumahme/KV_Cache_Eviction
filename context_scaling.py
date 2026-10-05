@@ -1,26 +1,4 @@
 """
-Context-scaling diagnostic.
-
-Question: does your evaluation text actually contain long-range dependencies?
-
-Method: fix a 512-token continuation at one absolute position. Vary ONLY how many
-preceding tokens the model sees. Full cache throughout -- no compression anywhere.
-This measures a property of the CORPUS, not of any compression method.
-
-Reading the output:
-
-  PPL keeps dropping out to 16k
-      -> real long-range structure. The corpus is valid, and any method that
-         discards distant context should lose. Trust your comparisons.
-
-  PPL plateaus after 1-2k
-      -> no usable long-range dependency. Distant context is noise. Recency
-         policies win trivially and the corpus CANNOT evaluate KV compression.
-
-  PPL gets WORSE with more context
-      -> distant context is actively misleading, which is what concatenating
-         unrelated articles produces. Same conclusion, more emphatic.
-
 Usage:
     python context_scaling.py                     # wikitext, the suspect corpus
     python context_scaling.py --text-file doc.txt # a single coherent document
